@@ -83,6 +83,7 @@ void input(void){
     vector<char> buffer;
     char c;
     bool running = 1;
+    string s;
     while(running){
         switch((c = getchar())){
             case 'X':
@@ -95,7 +96,7 @@ void input(void){
                 running = 0;
                 //fall through and complete last line
             case 'E':
-                string s(buffer.begin(),buffer.end());
+                s = string(buffer.begin(),buffer.end());
                 write(outPipeFd[1],s.c_str(),s.size()+1);
                 write(transPipeFd[1],s.c_str(),s.size()+1);
                 buffer.clear();
