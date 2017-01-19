@@ -1,54 +1,54 @@
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <fcntl.h>
-#include <cstring>
-#include <string>
-#include <vector>
-#include <algorithm>
-
-#define MSG_SIZE 256
+#include "main.h"
 
 using namespace std;
 
-//pipes for output and translate
-int outPipeFd[2], transPipeFd[2], transOutPipeFd[2];
-
-//child pid
-pid_t pid;
-//flag for killing loop from sig handler
-bool running = 1;
-
-//functions for the processes
-void output();
-void input();
-void translate();
-
-//shared signal handler
-void signal_handler(int sig);
-
-int main(int argc, char *argv[]){
+//pipe from input to output
+int outPipeFd[2];
+//pipe from input to translate
+int transPipeFd[2];
+//pipe from translate to output
+int transOutPipeFd[2];
+/**
+ * Function: main
+ * 
+ * Date: 2017/01/15
+ *
+ * Designer: Isaac Morneau; A00958405
+ *
+ * Programmer: Isaac Morneau; A00958405
+ *
+ * Interface: int main(void)
+ *
+ * Return: int - the return value for the whole application
+ *
+ * Notes: Main opens the pipes for communication between input, translate, and output.
+ * It sets the terminal to raw mode then it forks twice to create the afore mentioned processes. 
+ */
+int main(void){
     //open pipes
-    if(pipe(outPipeFd) < 0 || pipe(transPipeFd) < 0 || pipe(transOutPipeFd)){
+    if(pipe(outPipeFd) < 0 
+            || pipe(transPipeFd) < 0 
+            || pipe(transOutPipeFd) < 0){
         perror("Failed to open pipes\n");
         exit(1);
     }
     //switch to non blocking mode
-    if(fcntl(outPipeFd[0], F_SETFL, O_NDELAY) < 0  || fcntl(transPipeFd[0], F_SETFL, O_NDELAY) < 0 || fcntl(transOutPipeFd[0], F_SETFL, O_NDELAY) < 0){
-        perror("fnctrl error");
+    if(fcntl(outPipeFd[0], F_SETFL, O_NDELAY) < 0  
+            || fcntl(transPipeFd[0], F_SETFL, O_NDELAY) < 0 
+            || fcntl(transOutPipeFd[0], F_SETFL, O_NDELAY) < 0){
+        perror("fnctrl error\n");
         exit(1);
     }
+    //set the terminal to raw mode
+    system("stty raw igncr -echo");
 
-    pid = fork();
-    switch(pid){
+    switch(fork()){
         case -1:
             perror("failed first fork\n");
             exit(2);
             break;
         case 0://child
-            pid = fork();
-            switch(pid){
+            switch(fork()){
                 case -1:
                     perror("failed second fork\n");
                     exit(3);
@@ -68,14 +68,10 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
-void signal_handler(int sig){
-    running = 0;
-}
-
-void output(){
+void output(void){
     //buffer for reading
     char inbuff[MSG_SIZE];
-    while(running){
+    while(1){
         if(read(outPipeFd[0],inbuff,MSG_SIZE)>0)
             printf("%s\r\n",inbuff);
         if(read(transOutPipeFd[0],inbuff,MSG_SIZE)>0)
@@ -83,19 +79,10 @@ void output(){
     }
 }
 
-void input(){
-    struct sigaction sa;
-    sa.sa_handler = signal_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags=0;
-    sigaction(SIGTERM, &sa, NULL);
-
-    system("stty raw igncr -echo");
-    
+void input(void){
     vector<char> buffer;
     char c;
-    string s;
-    
+    bool running = 1;
     while(running){
         switch((c = getchar())){
             case 'X':
@@ -105,46 +92,37 @@ void input(){
                 buffer.clear();
                 break;
             case 'T':
-                running = false;
+                running = 0;
                 //fall through and complete last line
             case 'E':
-                s = string(buffer.begin(),buffer.end());
+                string s(buffer.begin(),buffer.end());
                 write(outPipeFd[1],s.c_str(),s.size()+1);
                 write(transPipeFd[1],s.c_str(),s.size()+1);
                 buffer.clear();
                 break;
-            case 11:
+            case 11://ctrl-k
                 exit(0);
                 break;
-            default:
+            default://non control character
                 buffer.push_back(c);
                 break;
         }
     }
-    kill(pid,SIGTERM);
-    wait(static_cast<int*>(0));
+    //reset terminal to normal mode before exit
     system("stty -raw -igncr echo");
+    //kill all processes in process tree
+    kill(0,SIGTERM);
+    wait(static_cast<int*>(0));
 }
 
-void translate(){
-    struct sigaction sa;
-    sa.sa_handler = signal_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags=0;
-    sigaction(SIGTERM, &sa, NULL);
-    
-    //buffer for reading
+void translate(void){
     char inbuff[MSG_SIZE];
-    
-    while(running){
+    while(1){
         if(read(transPipeFd[0],inbuff,MSG_SIZE)>0) {
             string s(inbuff,strlen(inbuff));
             replace(s.begin(),s.end(),'a','z');
             write(transOutPipeFd[1],s.c_str(),s.size()+1);
         }
     }
-
-    kill(pid,SIGTERM);
-    wait(static_cast<int*>(0));
 }
 
