@@ -34,8 +34,8 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <cstring>
-#include <string>
 #include <vector>
+#include <string>
 #include <algorithm>
 
 #define MSG_SIZE 256
@@ -72,11 +72,10 @@ void output(void);
  * Return: void
  *
  * Notes: Input disables the default terminal standard input handling and then reads for characters.
+ * It also handles the control characters
  *      When an 'E' is received it writes the message to its output pipes.
  *      When a 'T' is received it writes the message to its output pipes and closes the program
  *          killing both other processes.
- *      When a 'X' is received the last character before it is deleted from the buffer.
- *      When a 'K' is received the buffer is cleared.
  *      When a ^K is received the program shuts down without cleanup
  */
 void input(void);
@@ -95,7 +94,9 @@ void input(void);
  * Return: void
  *
  * Notes: Translate reads from its input pipe and replaces all 'a's with 'z's then writes the new
- * message to the output pipe
+ * message to the output pipe. It also handles the control characters:
+ *      When a 'X' is received the last character before it is deleted from the buffer.
+ *      When a 'K' is received the buffer is cleared.
  */
 void translate(void);
 #endif

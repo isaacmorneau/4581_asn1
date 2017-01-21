@@ -71,34 +71,46 @@ int main(void){
 void output(void){
     //buffer for reading
     char inbuff[MSG_SIZE];
+    char c;
+    int readO,readT;
+
+    //close unused handles
+    close(outPipeFd[1]);
+    close(transPipeFd[0]);
+    close(transPipeFd[1]);
+    close(transOutPipeFd[1]);
+
     while(1){
-        if(read(outPipeFd[0],inbuff,MSG_SIZE)>0)
-            printf("%s\r\n",inbuff);
-        if(read(transOutPipeFd[0],inbuff,MSG_SIZE)>0)
-            printf("%s\r\n",inbuff);
+        if((readO = read(outPipeFd[0],&c,1))>0)
+            printf(">%c",c);
+        if((readT = read(transOutPipeFd[0],inbuff,MSG_SIZE))>0)
+            printf("!%s\r\n",inbuff);
     }
 }
 
 void input(void){
     vector<char> buffer;
-    char c;
-    bool running = 1;
+    char c, *outbuff;
     string s;
+    bool running = 1;
+    close(outPipeFd[0]);
+    close(transPipeFd[0]);
+    close(transOutPipeFd[0]);
+    close(transOutPipeFd[1]);
+    
     while(running){
-        switch((c = getchar())){
-            case 'X':
-                buffer.pop_back();
-                break;
-            case 'K':
-                buffer.clear();
-                break;
-            case 'T':
+        c = getchar();
+        //always send to output
+        write(outPipeFd[1],&c,1);
+        switch(c){
+            case EOF:
+            case 'T'://terminate
                 running = 0;
                 //fall through and complete last line
-            case 'E':
-                s = string(buffer.begin(),buffer.end());
-                write(outPipeFd[1],s.c_str(),s.size()+1);
-                write(transPipeFd[1],s.c_str(),s.size()+1);
+            case 'E'://enter line
+                outbuff = static_cast<char*>(malloc(buffer.size()*sizeof(char)));
+                copy(buffer.begin(),buffer.end(),outbuff);
+                write(transPipeFd[1],outbuff,buffer.size());
                 buffer.clear();
                 break;
             case 11://ctrl-k
@@ -117,12 +129,33 @@ void input(void){
 }
 
 void translate(void){
+    //buffer for reading
     char inbuff[MSG_SIZE];
+    int nread;
+
+    //close unused pipes
+    close(outPipeFd[0]);
+    close(outPipeFd[1]);
+    close(transPipeFd[1]);
+    close(transOutPipeFd[0]);
+
     while(1){
-        if(read(transPipeFd[0],inbuff,MSG_SIZE)>0) {
-            string s(inbuff,strlen(inbuff));
-            replace(s.begin(),s.end(),'a','z');
-            write(transOutPipeFd[1],s.c_str(),s.size()+1);
+        if((nread = read(transPipeFd[0],inbuff,MSG_SIZE))>0) {
+            for(int i = 0; i < nread; i++) {
+                if(inbuff[i] == 'X'){
+                    memmove(inbuff+i-1,inbuff+i+1,nread - i);
+                    nread -= 2;
+                    if(i>=2)
+                        i -= 2;
+                } else if(inbuff[i] == 'K') {
+                    memmove(inbuff,inbuff+i+1,nread - i);
+                    nread -= i;
+                    i = 0;
+                } else if(inbuff[i] == 'a') {
+                    inbuff[i] = 'z';
+                }
+            }
+            write(transOutPipeFd[1],inbuff,strlen(inbuff)+1);
         }
     }
 }
