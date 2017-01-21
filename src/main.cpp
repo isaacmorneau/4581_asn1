@@ -81,10 +81,12 @@ void output(void){
     close(transOutPipeFd[1]);
 
     while(1){
-        if((readO = read(outPipeFd[0],&c,1))>0)
-            printf(">%c",c);
+        if((readO = read(outPipeFd[0],&c,1))>0) {
+            printf("%c",c);
+            fflush(stdout);
+        }
         if((readT = read(transOutPipeFd[0],inbuff,MSG_SIZE))>0)
-            printf("!%s\r\n",inbuff);
+            printf("%s\r\n",inbuff);
     }
 }
 
@@ -143,13 +145,15 @@ void translate(void){
         if((nread = read(transPipeFd[0],inbuff,MSG_SIZE))>0) {
             for(int i = 0; i < nread; i++) {
                 if(inbuff[i] == 'X'){
-                    memmove(inbuff+i-1,inbuff+i+1,nread - i);
+                    memmove(inbuff + i - 1,inbuff+i+1,nread - i - 1);
                     nread -= 2;
+                    inbuff[nread] = '\0';
                     if(i>=2)
                         i -= 2;
                 } else if(inbuff[i] == 'K') {
                     memmove(inbuff,inbuff+i+1,nread - i);
-                    nread -= i;
+                    nread -= i - 1;
+                    inbuff[nread] = '\0';
                     i = 0;
                 } else if(inbuff[i] == 'a') {
                     inbuff[i] = 'z';
