@@ -1,6 +1,6 @@
 CXXFLAGS := -Wall -pedantic -pipe -std=c++14
 CLIBS := -pthread
-APPNAME := AppName
+APPNAME := asn1
 ODIR := bin
 SRC := src
 HEAD := $(SRC)/headers

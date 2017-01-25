@@ -85,8 +85,10 @@ void output(void){
             printf("%c",c);
             fflush(stdout);
         }
-        if((readT = read(transOutPipeFd[0],inbuff,MSG_SIZE))>0)
-            printf("%s\r\n",inbuff);
+        if((readT = read(transOutPipeFd[0],inbuff,MSG_SIZE))>0){
+            printf("\r\n%s",inbuff);
+            fflush(stdout);
+        }
     }
 }
 
@@ -147,19 +149,19 @@ void translate(void){
                 if(inbuff[i] == 'X'){
                     memmove(inbuff + i - 1,inbuff+i+1,nread - i - 1);
                     nread -= 2;
-                    inbuff[nread] = '\0';
                     if(i>=2)
                         i -= 2;
                 } else if(inbuff[i] == 'K') {
                     memmove(inbuff,inbuff+i+1,nread - i);
                     nread -= i - 1;
-                    inbuff[nread] = '\0';
                     i = 0;
                 } else if(inbuff[i] == 'a') {
                     inbuff[i] = 'z';
                 }
             }
+            inbuff[nread] = '\0';
             write(transOutPipeFd[1],inbuff,strlen(inbuff)+1);
+            memset(inbuff,'\0',MSG_SIZE);
         }
     }
 }
