@@ -86,7 +86,9 @@ void output(void){
             fflush(stdout);
         }
         if((readT = read(transOutPipeFd[0],inbuff,MSG_SIZE))>0){
-            printf("\r\n%s",inbuff);
+            inbuff[readT] = '\0';
+            //print on a new line and move curser back
+            printf("\r\n%s\r\n",inbuff);
             fflush(stdout);
         }
     }
@@ -97,11 +99,13 @@ void input(void){
     char c, *outbuff;
     string s;
     bool running = 1;
+
+    //close unused handles
     close(outPipeFd[0]);
     close(transPipeFd[0]);
     close(transOutPipeFd[0]);
     close(transOutPipeFd[1]);
-    
+
     while(running){
         c = getchar();
         //always send to output
@@ -116,6 +120,7 @@ void input(void){
                 copy(buffer.begin(),buffer.end(),outbuff);
                 write(transPipeFd[1],outbuff,buffer.size());
                 buffer.clear();
+                free(outbuff);
                 break;
             case 11://ctrl-k
                 exit(0);
@@ -136,30 +141,39 @@ void translate(void){
     //buffer for reading
     char inbuff[MSG_SIZE];
     int nread;
-
+    int from, to;
     //close unused pipes
     close(outPipeFd[0]);
     close(outPipeFd[1]);
     close(transPipeFd[1]);
     close(transOutPipeFd[0]);
 
+    memset(inbuff,'\0',MSG_SIZE);
+
     while(1){
         if((nread = read(transPipeFd[0],inbuff,MSG_SIZE))>0) {
             for(int i = 0; i < nread; i++) {
                 if(inbuff[i] == 'X'){
-                    memmove(inbuff + i - 1,inbuff+i+1,nread - i - 1);
-                    nread -= 2;
-                    if(i>=2)
+                    if(i > 0){
+                        from = i+1;
+                        to = i-1;
+                        memmove(inbuff + to, inbuff + from, strlen(inbuff) - i + 1);
+                        nread -= 2;
                         i -= 2;
+                    } else {
+                        //the first char is backspace, remove it and do nothing
+                        memmove(inbuff, inbuff + 1, nread);
+                        nread -= 1;
+                        i = -1;
+                    }
                 } else if(inbuff[i] == 'K') {
-                    memmove(inbuff,inbuff+i+1,nread - i);
-                    nread -= i - 1;
-                    i = 0;
+                    memmove(inbuff, inbuff+i+1, strlen(inbuff)-i+1);
+                    nread -= i;
+                    i = -1;
                 } else if(inbuff[i] == 'a') {
                     inbuff[i] = 'z';
                 }
             }
-            inbuff[nread] = '\0';
             write(transOutPipeFd[1],inbuff,strlen(inbuff)+1);
             memset(inbuff,'\0',MSG_SIZE);
         }
